@@ -18,6 +18,7 @@ export default createGlobalStyle<Props>`
   html {
     --line-height-body: 1.5;
     --font-size-body: 16px;
+    --chaos-header-height: 56px;
   }
 
   html,
@@ -60,6 +61,22 @@ export default createGlobalStyle<Props>`
     ${(props) => (props.staticHTML ? "" : "width: 100vw;")}
     overflow-x: hidden;
     padding-right: calc(0 - var(--removed-body-scroll-bar-size)) !important;
+  }
+
+  div#root {
+    zoom: 1.1;
+
+    @media print {
+      zoom: 1;
+    }
+  }
+
+  div#sidebar {
+    zoom: 1.1;
+
+    @media print {
+      zoom: 1;
+    }
   }
 
   @media (min-width: ${breakpoints.tablet}px) {
