@@ -1,208 +1,82 @@
-Outline is a fast, collaborative knowledge base built for teams. It's built with React and TypeScript in both frontend and backend, uses a real-time collaboration engine, and is designed for excellent performance and user experience. The backend is a Koa server with an RPC API and uses PostgreSQL and Redis. The application can be self-hosted or used as a cloud service.
+This repository is a fork of Outline, the open-source collaborative wiki.
+Outline is a React and TypeScript application with a Koa API server, PostgreSQL,
+Redis, real-time collaboration, and a responsive web client.
 
-There is a web client which is fully responsive and works on mobile devices.
+The purpose of this fork is to customize Outline for CHAOS, the outdoors club at
+UC Berkeley. Treat this repository as a patch set on top of upstream Outline,
+not as a divergent product. GitHub Actions are expected to reapply the fork's
+changes whenever upstream `main` is updated, so every change should be designed
+to minimize merge conflicts.
 
-**Monorepo Structure:**
+## Primary Components
 
-- **`app/`** - React web application with MobX state management
-- **`server/`** - Koa API server with Sequelize ORM and background workers
-- **`shared/`** - Shared TypeScript types, utilities, and editor components
-- **`plugins/`** - Plugin system for extending functionality
-- **`public/`** - Static assets served directly
-- **Various config files** - TypeScript, Vite, Jest, Prettier, Oxlint configurations
+- `app/` - React web client using TypeScript, MobX, React Router, and
+  styled-components.
+- `server/` - Koa API server, RPC endpoints, Sequelize models, background jobs,
+  PostgreSQL access, Redis integration, and authentication.
+- `shared/` - Shared TypeScript utilities, types, validation, and editor code.
+- `plugins/` - Extension points and optional integrations.
+- `public/` - Static assets served directly by the application.
+- `docs/` - Architecture and operational documentation inherited from Outline.
+- `patches/` - Package or dependency patches that should remain narrow and
+  explainable.
 
-Refer to /docs/ARCHITECTURE.md for detailed architecture documentation.
+Refer to `docs/ARCHITECTURE.md` for deeper architecture details.
 
-## Instructions
+## Patch Discipline
 
-You're an expert in the following areas:
+- Make surgical changes. Prefer the smallest change that solves the problem.
+- Avoid broad refactors, formatting-only churn, file moves, and import reshuffles
+  unless they are required for the task.
+- Keep CHAOS-specific behavior compartmentalized in new files where practical.
+  Wire those files into existing Outline code through small, obvious integration
+  points.
+- Prefer additive changes over editing upstream logic in place. When upstream
+  files must change, keep the diff local to the relevant function, component, or
+  route.
+- Do not rename upstream exports, routes, database columns, translation keys, or
+  shared types unless the task explicitly requires it.
+- Preserve existing Outline conventions even when adding CHAOS-specific UI,
+  navigation, styling, or embeds.
+- Avoid changing dependency versions unless necessary. Use `yarn` for dependency
+  management and run `yarn install` after dependency updates.
+- Do not create new Markdown files unless explicitly asked.
 
-- TypeScript
-- React and React Router
-- MobX and MobX-React
-- Node.js and Koa
-- Sequelize ORM
-- PostgreSQL
-- Redis
-- HTML, CSS and Styled Components
-- Prosemirror (rich text editor)
-- WebSockets and real-time collaboration
+## TypeScript And React
 
-## General Guidelines
+- Use strict TypeScript. Do not use `any`; avoid `unknown` unless necessary.
+- Prefer interfaces for object shapes and named exports for new components.
+- Use functional React components with hooks.
+- Prefix event handlers with `handle`, such as `handleClick`.
+- Use MobX stores for global state and keep business logic out of components.
+- Use styled-components for styling and keep accessibility in mind.
+- Do not manually add translation strings; they are extracted automatically.
 
-- Critical – Do not create new markdown (.md) files.
-- Use early returns for readability.
-- Emphasize type safety and static analysis.
-- Follow consistent Prettier formatting.
-- Do not replace smart quotes ("") or ('') with simple quotes ("").
-- Do not add translation strings manually; they will be extracted automatically from the codebase.
+## Backend And Data
 
-## Dependencies and Upgrading
+- Keep API routes thin. Put business logic in models, commands, or services that
+  match existing Outline patterns.
+- Validate request data with existing validation middleware and schemas.
+- Check authorization before accessing or mutating user data.
+- Use transactions for multi-table writes and add indexes for new query paths.
+- Handle database errors gracefully and avoid exposing sensitive details.
 
-- Use yarn for all dependency management.
-- After updating dependency versions, install to update lockfiles:
+## Editor And Security
 
-```bash
-yarn install
-```
+- Be especially careful in ProseMirror and editor code, which is shared and
+  merge-prone.
+- Always use `sanitizeUrl()` when setting `href` or `src` from user-controlled
+  data in ProseMirror `toDOM` methods. `toDOM` writes raw DOM and does not get
+  React's attribute sanitization.
+- Sanitize user input, use existing CSRF and rate-limiting patterns, and keep
+  secrets in environment variables.
 
-- When adding a `resolutions` entry to address a security advisory in a transitive dependency, target only the specific vulnerable descriptors using the `name@npm:<range>` syntax rather than overriding the package globally. Inspect `yarn.lock` to find the exact ranges requested by upstream packages and add one entry per vulnerable range, e.g.:
+## Tests And Quality
 
-```json
-"resolutions": {
-  "qs@npm:^6.5.2": "^6.14.2",
-  "qs@npm:^6.11.0": "^6.14.2",
-  "qs@npm:^6.14.0": "^6.14.2"
-}
-```
+- Add focused tests for utilities, business logic, editor behavior, and
+  user-facing workflows that the change affects.
+- Prefer running targeted tests, for example `yarn test path/to/test.spec.ts`.
+- Use `yarn lint`, `yarn tsc`, and targeted Jest runs when appropriate for the
+  change.
+- Follow the repository's Prettier and Oxlint configuration.
 
-This keeps overrides scoped to the affected dependents and avoids forcing unrelated consumers onto an incompatible version.
-
-## TypeScript Usage
-
-- Use strict mode.
-- Avoid "unknown" unless absolutely necessary.
-- Never use "any".
-- Prefer type definitions; avoid type assertions (as, !).
-- Always use curly braces for if statements.
-- Avoid # for private properties.
-- Prefer interface over type for object shapes.
-
-## Classes & Code Organization
-
-### Class Member Order
-
-1. Public static variables
-2. Public static methods
-3. Public variables
-4. Public methods
-5. Protected variables & methods
-6. Private variables & methods
-
-### Exports
-
-- Exported members must appear at the top of the file.
-- Always use named exports for new components & classes.
-- Document ALL public/exported functions with JSDoc.
-
-## React Usage
-
-- Use functional components with hooks.
-- Event handlers should be prefixed with "handle", like "handleClick" for onClick.
-- Avoid unnecessary re-renders by using React.memo, useMemo, and useCallback appropriately.
-- Use descriptive prop types with TypeScript interfaces.
-- Do not import React unless it is used directly.
-- Use styled-components for component styling.
-- Ensure high accessibility (a11y) standards using ARIA roles and semantic HTML.
-
-## MobX State Management
-
-- Use MobX stores for global state management.
-- Keep stores in `app/stores/`.
-- Use `observable`, `action`, and `computed` decorators appropriately.
-- Prefer computed values over manual calculations in render.
-- Keep business logic in stores, not components.
-
-## Database & ORM
-
-- Use Sequelize models in `server/models/`.
-- Generate migrations with Sequelize CLI:
-
-```bash
-yarn sequelize migration:create --name=add-field-to-table
-```
-
-- Run migrations with `yarn db:migrate`.
-- Use transactions for multi-table operations.
-- Add appropriate indexes for query performance.
-- Always handle database errors gracefully.
-
-## API Design
-
-- RESTful endpoints under `/api/`.
-- Authentication endpoints under `/auth/`.
-- Use consistent error responses.
-- Validate request data using the validation middleware and schemas
-- Use presenters to format API responses.
-- Keep API routes thin, use model methods for business logic, or commands if logic spans multiple models.
-
-## Authentication & Authorization
-
-- JWT tokens for authentication.
-- Policies in `server/policies/` for authorization.
-- Use cancan-style ability checks.
-- Use authenticated middleware for protected routes.
-- Always verify user permissions before data access.
-
-## Real-time Collaboration
-
-- WebSocket connections for real-time updates.
-- Use Y.js for collaborative editing.
-- Handle connection state changes gracefully.
-
-## Documentation
-
-- All public/exported functions & classes must have JSDoc.
-- Include:
-  - Description
-  - @param and @return (start lowercase, end with period)
-  - @throws if applicable
-- Add a newline between the description and the @ block.
-- Use correct punctuation.
-
-## Testing
-
-- Run tests with Jest:
-
-```bash
-# Run a specific test file (preferred)
-yarn test path/to/test.spec.ts
-
-# Run every test (avoid)
-yarn test
-
-# Run test suites (avoid)
-yarn test:app      # All frontend tests
-yarn test:server   # All backend tests
-yarn test:shared   # All shared code tests
-```
-
-- Write unit tests for utilities and business logic in a collocated .test.ts file.
-- Do not create new test directories
-- Mock external dependencies appropriately in **mocks** folder.
-- Aim for high code coverage but focus on critical paths.
-
-## Code Quality
-
-- Use Oxlint for linting: `yarn lint`
-- Format code with Prettier: `yarn format`
-- Check types with TypeScript: `yarn tsc`
-- Pre-commit hooks run automatically via Husky.
-- Fix linting issues before committing.
-
-## Error Handling
-
-- Use custom error classes in `server/errors.ts`.
-- Always catch and handle errors appropriately.
-- Log errors with appropriate context.
-- Return user-friendly error messages.
-- Never expose sensitive information in errors.
-
-## Performance
-
-- Use React.memo for expensive components.
-- Implement pagination for large lists.
-- Use database indexes effectively.
-- Cache expensive computations.
-- Monitor performance with appropriate tools.
-- Lazy load routes and components where appropriate.
-
-## Security
-
-- Sanitize all user input.
-- Always use `sanitizeUrl()` when setting `href` or `src` from user-controlled data in ProseMirror `toDOM` methods, regardless of whether it is imported via an alias or a relative path. Unlike React components, `toDOM` writes raw DOM and does not sanitize attribute values.
-- Use CSRF protection.
-- Use rateLimiter middleware for sensitive endpoints.
-- Follow OWASP guidelines.
-- Never store sensitive data in plain text.
-- Use environment variables for secrets.

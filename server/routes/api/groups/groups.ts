@@ -14,7 +14,7 @@ import {
   ExternalGroup,
   AuthenticationProvider,
 } from "@server/models";
-import { authorize } from "@server/policies";
+import { authorize, can } from "@server/policies";
 import { ValidationError } from "@server/errors";
 import {
   presentGroup,
@@ -431,7 +431,11 @@ router.post(
         groupMemberships: groupUsers.map((groupUser) =>
           presentGroupUser(groupUser, { includeUser: true })
         ),
-        users: groupUsers.map((groupUser) => presentUser(groupUser.user)),
+        users: groupUsers.map((groupUser) =>
+          presentUser(groupUser.user, {
+            includeEmail: !!can(user, "readEmail", groupUser.user),
+          })
+        ),
       },
     };
   }
