@@ -25,6 +25,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure Git
         run: |
@@ -54,24 +55,41 @@ jobs:
 
       - name: Push sync branch
         if: steps.upstream.outputs.has_updates == 'true'
+        env:
+          UPSTREAM_SYNC_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
         run: |
-          git push --force-with-lease origin sync/upstream-main
+          if [ -z "$UPSTREAM_SYNC_TOKEN" ]; then
+            echo "::error::Missing repository secret UPSTREAM_SYNC_TOKEN. Create a PAT with Contents, Pull requests, and Workflows read/write access, then save it as this Actions secret."
+            exit 1
+          fi
+
+          git push --force "https://x-access-token:${UPSTREAM_SYNC_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" sync/upstream-main
 
       - name: Open or update pull request
         if: steps.upstream.outputs.has_updates == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
         run: |
-          pr_number="$(gh pr list --head sync/upstream-main --base main --state open --json number --jq '.[0].number')"
+          title="Sync upstream Outline main"
+          body="Automated attempt to merge outline/outline main into this CHAOS patch fork."
+          head="${GITHUB_REPOSITORY_OWNER}:sync/upstream-main"
+
+          pr_number="$(
+            gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f head="$head" \
+              -f base="main" \
+              -f state="open" \
+              --jq '.[0].number // ""'
+          )"
 
           if [ -n "$pr_number" ]; then
-            gh pr edit "$pr_number" \
-              --title "Sync upstream Outline main" \
-              --body "Automated attempt to merge outline/outline main into this CHAOS patch fork."
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+              -f title="$title" \
+              -f body="$body"
           else
-            gh pr create \
-              --base main \
-              --head sync/upstream-main \
-              --title "Sync upstream Outline main" \
-              --body "Automated attempt to merge outline/outline main into this CHAOS patch fork."
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f title="$title" \
+              -f head="$head" \
+              -f base="main" \
+              -f body="$body"
           fi
