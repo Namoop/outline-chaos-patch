@@ -56,7 +56,7 @@ const Layout = React.forwardRef(function Layout_(
             sidebarCollapsed
               ? undefined
               : {
-                  marginInlineStart: `${ui.sidebarWidth}px`,
+                  marginInlineStart: `${ui.sidebarWidth * 1.1}px`,
                 }
           }
         >
@@ -100,7 +100,7 @@ const Content = styled(Flex)<ContentProps>`
     ${(props: ContentProps) =>
       props.$hasSidebar &&
       props.$sidebarCollapsed &&
-      `margin-inline-start: ${props.theme.sidebarCollapsedWidth}px;`}
+      `margin-inline-start: ${props.theme.sidebarCollapsedWidth * 1.1}px;`}
   `};
 `;
 

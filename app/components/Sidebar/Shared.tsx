@@ -1,6 +1,11 @@
 import { useKBar } from "kbar";
 import { observer } from "mobx-react";
-import { SearchIcon } from "outline-icons";
+import {
+  CalendarIcon,
+  CollectionIcon,
+  HomeIcon,
+  SearchIcon,
+} from "outline-icons";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
@@ -25,14 +30,36 @@ import Section from "./components/Section";
 import { SharedCollectionLink } from "./components/SharedCollectionLink";
 import { SharedDocumentLink } from "./components/SharedDocumentLink";
 import SidebarButton from "./components/SidebarButton";
+import SidebarLink from "./components/SidebarLink";
 
 type Props = {
   share: Share;
 };
 
+const sharedCollectionLinks = [
+  {
+    label: "Trips",
+    shareId: "trips",
+    path: "/s/trips",
+    icon: <CollectionIcon />,
+  },
+  {
+    label: "Home",
+    shareId: "home",
+    path: "/s/home",
+    icon: <HomeIcon />,
+  },
+  {
+    label: "Events",
+    shareId: "events",
+    path: "/s/events",
+    icon: <CalendarIcon />,
+  },
+];
+
 function SharedSidebar({ share }: Props) {
   const user = useCurrentUser({ rejectOnEmpty: false });
-  const { ui, documents, collections } = useStores();
+  const { ui, documents, collections, shares } = useStores();
   const { t } = useTranslation();
   const { query } = useKBar();
 
@@ -58,6 +85,14 @@ function SharedSidebar({ share }: Props) {
   useEffect(() => {
     ui.tocVisible = share.showTOC;
   }, []);
+
+  useEffect(() => {
+    void Promise.all(
+      sharedCollectionLinks.map((link) =>
+        shares.fetch(link.shareId).catch(() => undefined)
+      )
+    );
+  }, [shares]);
 
   if (!rootNode?.children.length) {
     return null;
@@ -95,6 +130,17 @@ function SharedSidebar({ share }: Props) {
             </Shortcut>
           </SearchButton>
         </TopSection>
+        <SharedCollectionsSection as="nav" aria-label={t("Collections")}>
+          {sharedCollectionLinks.map((link) => (
+            <SidebarLink
+              key={link.path}
+              to={link.path}
+              icon={link.icon}
+              label={link.label}
+              scrollIntoViewIfNeeded={false}
+            />
+          ))}
+        </SharedCollectionsSection>
         <Section as="nav" aria-label={t("Documents")}>
           <SidebarExpansionContext.Provider value={expansion}>
             {share.collectionId ? (
@@ -129,6 +175,11 @@ const ScrollContainer = styled(Scrollable)`
 const TopSection = styled(Flex)`
   padding: 8px;
   flex-shrink: 0;
+`;
+
+const SharedCollectionsSection = styled(Section)`
+  padding-bottom: 12px;
+  border-bottom: 1px solid ${s("inputBorder")};
 `;
 
 const SearchButton = styled.button`

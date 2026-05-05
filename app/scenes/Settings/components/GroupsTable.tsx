@@ -20,7 +20,6 @@ import { type Column as TableColumn } from "~/components/Table";
 import { ContextMenu } from "~/components/Menu/ContextMenu";
 import { useGroupMenuActions } from "~/hooks/useGroupMenuActions";
 import Text from "~/components/Text";
-import Time from "~/components/Time";
 import GroupMenu from "~/menus/GroupMenu";
 import { FILTER_HEIGHT } from "./StickyFilters";
 import NudeButton from "~/components/NudeButton";
@@ -28,6 +27,7 @@ import { AvatarSize } from "~/components/Avatar";
 import { HStack } from "~/components/primitives/HStack";
 import Tooltip from "~/components/Tooltip";
 import { settingsPath } from "~/utils/routeHelpers";
+import { EmailGroupButton } from "./EmailGroupButton";
 
 const ROW_HEIGHT = 60;
 const STICKY_OFFSET = HEADER_HEIGHT + FILTER_HEIGHT;
@@ -75,6 +75,12 @@ export function GroupsTable(props: Props) {
   const columns = useMemo<TableColumn<Group>[]>(
     () =>
       compact<TableColumn<Group>>([
+        {
+          type: "action",
+          id: "email",
+          component: (group) => <EmailGroupButton group={group} />,
+          width: "32px",
+        },
         {
           type: "data",
           id: "name",
@@ -146,44 +152,6 @@ export function GroupsTable(props: Props) {
           },
           width: "1.5fr",
           sortable: false,
-        },
-        {
-          type: "data",
-          id: "source",
-          header: t("Source"),
-          accessor: (group) => group.externalGroup?.displayName ?? "manual",
-          component: (group) =>
-            group.externalGroup ? (
-              <Flex column>
-                <Text type="secondary" size="small" weight="normal">
-                  {group.externalGroup.displayName}
-                </Text>
-                {group.externalGroup.lastSyncedAt && (
-                  <Text type="tertiary" size="xsmall" weight="normal">
-                    <Trans>
-                      Synced{" "}
-                      <Time
-                        dateTime={group.externalGroup.lastSyncedAt}
-                        addSuffix
-                        shorten
-                      />
-                    </Trans>
-                  </Text>
-                )}
-              </Flex>
-            ) : null,
-          width: "1fr",
-        },
-        {
-          type: "data",
-          id: "createdAt",
-          header: t("Date created"),
-          accessor: (group) => group.createdAt,
-          component: (group) =>
-            group.createdAt ? (
-              <Time dateTime={group.createdAt} addSuffix />
-            ) : null,
-          width: "1fr",
         },
         {
           type: "action",
