@@ -1,0 +1,57 @@
+name: Propose CHAOS Upstream Update
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: propose-chaos-upstream
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    name: Open main to chaos-main PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for upstream changes not in chaos-main
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ahead_by="$(gh api "repos/${GITHUB_REPOSITORY}/compare/chaos-main...main" --jq '.ahead_by')"
+          echo "ahead_by=${ahead_by}" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update pull request
+        if: steps.compare.outputs.ahead_by != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Update CHAOS branch from upstream Outline"
+          body="Automated PR to bring upstream Outline changes from main into chaos-main. Merging this PR keeps the current CHAOS version and creates a new release only if the combined tag does not already exist."
+          head="${GITHUB_REPOSITORY_OWNER}:main"
+
+          pr_number="$(
+            gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f head="$head" \
+              -f base="chaos-main" \
+              -f state="open" \
+              --jq '.[0].number // ""'
+          )"
+
+          if [ -n "$pr_number" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+              -f title="$title" \
+              -f body="$body"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f title="$title" \
+              -f head="$head" \
+              -f base="chaos-main" \
+              -f body="$body"
+          fi

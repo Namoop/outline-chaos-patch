@@ -4,10 +4,22 @@ on:
   pull_request:
     types:
       - closed
+    branches:
+      - chaos-main
   workflow_dispatch:
     inputs:
+      bump:
+        description: "CHAOS version bump: keep, minor, major, or explicit"
+        required: true
+        default: minor
+        type: choice
+        options:
+          - keep
+          - minor
+          - major
+          - explicit
       chaos_version:
-        description: "Optional CHAOS version suffix, for example 1.2"
+        description: "Required when bump is explicit, for example 0.1"
         required: false
 
 permissions:
@@ -19,67 +31,109 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CHAOS_RELEASE_MAJOR: "1"
-  CHAOS_FIRST_RELEASE_MINOR: "2"
+  CHAOS_INITIAL_VERSION: "0.1"
 
 jobs:
   release:
     name: Create release and Docker image
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.pull_request.merged == true &&
-        github.event.pull_request.base.ref == 'main' &&
-        github.event.pull_request.head.ref == 'sync/upstream-main'
-      )
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
+      - name: Checkout chaos-main
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: chaos-main
           fetch-depth: 0
 
       - name: Compute release version
         id: version
         env:
+          INPUT_BUMP: ${{ github.event.inputs.bump }}
           INPUT_CHAOS_VERSION: ${{ github.event.inputs.chaos_version }}
         run: |
           git fetch --tags --force
 
           outline_version="$(node -p "require('./package.json').version")"
+          latest_chaos_version=""
 
-          if [ -n "$INPUT_CHAOS_VERSION" ]; then
-            chaos_version="$INPUT_CHAOS_VERSION"
-          else
-            prefix="v${outline_version}-chaos.${CHAOS_RELEASE_MAJOR}."
-            latest_minor=""
-
-            while IFS= read -r tag; do
-              minor="${tag#"$prefix"}"
-              if [[ "$minor" =~ ^[0-9]+$ ]] && { [ -z "$latest_minor" ] || [ "$minor" -gt "$latest_minor" ]; }; then
-                latest_minor="$minor"
+          while IFS= read -r tag; do
+            version="${tag##*-chaos.}"
+            if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+              if [ -z "$latest_chaos_version" ]; then
+                latest_chaos_version="$version"
+                continue
               fi
-            done < <(git tag -l "${prefix}*")
 
-            if [ -z "$latest_minor" ]; then
-              chaos_minor="$CHAOS_FIRST_RELEASE_MINOR"
-            else
-              chaos_minor="$((latest_minor + 1))"
+              major="${version%%.*}"
+              minor="${version#*.}"
+              latest_major="${latest_chaos_version%%.*}"
+              latest_minor="${latest_chaos_version#*.}"
+
+              if [ "$major" -gt "$latest_major" ] || { [ "$major" -eq "$latest_major" ] && [ "$minor" -gt "$latest_minor" ]; }; then
+                latest_chaos_version="$version"
+              fi
             fi
+          done < <(git tag -l "*-chaos.*")
 
-            chaos_version="${CHAOS_RELEASE_MAJOR}.${chaos_minor}"
+          if [ -z "$latest_chaos_version" ]; then
+            latest_chaos_version="$CHAOS_INITIAL_VERSION"
+            has_existing_chaos_release="false"
+          else
+            has_existing_chaos_release="true"
           fi
 
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            bump="$INPUT_BUMP"
+          else
+            head_ref="$(jq -r '.pull_request.head.ref' "$GITHUB_EVENT_PATH")"
+            labels="$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")"
+
+            if [ "$head_ref" = "main" ]; then
+              bump="keep"
+            elif grep -qx "chaos:major" <<< "$labels"; then
+              bump="major"
+            elif grep -qx "chaos:minor" <<< "$labels"; then
+              bump="minor"
+            else
+              bump="minor"
+            fi
+          fi
+
+          case "$bump" in
+            keep)
+              chaos_version="$latest_chaos_version"
+              ;;
+            minor)
+              if [ "$has_existing_chaos_release" = "false" ]; then
+                chaos_version="$CHAOS_INITIAL_VERSION"
+              else
+                major="${latest_chaos_version%%.*}"
+                minor="${latest_chaos_version#*.}"
+                chaos_version="${major}.$((minor + 1))"
+              fi
+              ;;
+            major)
+              major="${latest_chaos_version%%.*}"
+              chaos_version="$((major + 1)).0"
+              ;;
+            explicit)
+              chaos_version="$INPUT_CHAOS_VERSION"
+              ;;
+            *)
+              echo "::error::Unsupported bump value: ${bump}"
+              exit 1
+              ;;
+          esac
+
           if [[ ! "$chaos_version" =~ ^[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::CHAOS version must look like 1.2"
+            echo "::error::CHAOS version must look like 0.1"
             exit 1
           fi
 
-          tag="v${outline_version}-chaos.${chaos_version}"
+          tag="${outline_version}-chaos.${chaos_version}"
 
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "::error::Tag ${tag} already exists"
+            echo "::error::Tag ${tag} already exists. Use a CHAOS version bump if this release should produce a new artifact."
             exit 1
           fi
 
@@ -87,6 +141,7 @@ jobs:
 
           echo "outline_version=$outline_version" >> "$GITHUB_OUTPUT"
           echo "chaos_version=$chaos_version" >> "$GITHUB_OUTPUT"
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "image_name=$image_name" >> "$GITHUB_OUTPUT"
           echo "base_image_name=${image_name}-base" >> "$GITHUB_OUTPUT"
@@ -141,6 +196,9 @@ jobs:
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
             --notes "CHAOS release based on Outline ${{ steps.version.outputs.outline_version }}.
+
+          CHAOS version: ${{ steps.version.outputs.chaos_version }}
+          Version bump: ${{ steps.version.outputs.bump }}
 
           Docker image:
           ${image_name}:${{ steps.version.outputs.tag }}"
