@@ -177,6 +177,7 @@ jobs:
             ${{ steps.version.outputs.image_name }}:latest
           build-args: |
             BASE_IMAGE=${{ steps.version.outputs.base_image_name }}:${{ steps.version.outputs.tag }}
+            CHAOS_RELEASE=${{ steps.version.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
