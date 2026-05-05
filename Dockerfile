@@ -11,8 +11,10 @@ FROM node:24.15.0-slim AS runner
 LABEL org.opencontainers.image.source="https://github.com/outline/outline"
 
 ARG APP_PATH
+ARG CHAOS_RELEASE
 WORKDIR $APP_PATH
 ENV NODE_ENV=production
+ENV CHAOS_RELEASE=$CHAOS_RELEASE
 
 # Create a non-root user compatible with Debian and BusyBox based images
 RUN addgroup --gid 1001 nodejs && \

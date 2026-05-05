@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import Badge from "~/components/Badge";
+import env from "~/env";
 import { client } from "~/utils/ApiClient";
 import Logger from "~/utils/Logger";
 import { version as currentVersion } from "../../../../package.json";
@@ -10,6 +11,7 @@ import SidebarLink from "./SidebarLink";
 export default function Version() {
   const [versionsBehind, setVersionsBehind] = useState(-1);
   const { t } = useTranslation();
+  const displayVersion = env.CHAOS_RELEASE ?? currentVersion;
 
   useEffect(() => {
     async function loadVersionInfo() {
@@ -33,7 +35,7 @@ export default function Version() {
       href="https://github.com/outline/outline/releases"
       label={
         <>
-          v{currentVersion}
+          {displayVersion}
           {versionsBehind >= 0 && (
             <>
               <br />

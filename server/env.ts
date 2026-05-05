@@ -524,6 +524,12 @@ export class Environment {
   );
 
   /**
+   * The CHAOS release tag for this build, for example "1.7.0-chaos.0.1".
+   */
+  @Public
+  public CHAOS_RELEASE = this.toOptionalString(environment.CHAOS_RELEASE);
+
+  /**
    * The maximum number of concurrent events processed per-worker. To get total
    * concurrency you should multiply this by the number of workers.
    */
