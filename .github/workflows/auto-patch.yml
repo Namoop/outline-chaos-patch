@@ -63,6 +63,7 @@ jobs:
             exit 1
           fi
 
+          git fetch origin sync/upstream-main:refs/remotes/origin/sync/upstream-main || true
           git push --force-with-lease "https://x-access-token:${UPSTREAM_SYNC_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" sync/upstream-main
 
       - name: Open or update pull request
