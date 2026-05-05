@@ -8,11 +8,12 @@ import type {
   Schema,
 } from "prosemirror-model";
 import type { Command } from "prosemirror-state";
-import { Plugin, Selection } from "prosemirror-state";
+import { Plugin, Selection, TextSelection } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import { toast } from "sonner";
 import type { Primitive } from "utility-types";
 import { isSafari } from "../../utils/browser";
+import type { Dictionary } from "~/hooks/useDictionary";
 import Storage from "../../utils/Storage";
 import backspaceToParagraph from "../commands/backspaceToParagraph";
 import splitHeading from "../commands/splitHeading";
@@ -30,15 +31,26 @@ export enum HeadingLevel {
   Four,
 }
 
-export default class Heading extends Node {
+/**
+ * Options for the Heading node.
+ */
+type HeadingOptions = {
+  /** Heading levels (1-based) that are enabled in this editor. */
+  levels: number[];
+  /** Offset added to the rendered heading level (e.g. 1 renders an `h2` for level 1). */
+  offset?: number;
+  /** A dictionary of translated strings used in the editor. */
+  dictionary: Dictionary;
+};
+
+export default class Heading extends Node<HeadingOptions> {
   get name() {
     return "heading";
   }
 
-  get defaultOptions() {
+  get defaultOptions(): Partial<HeadingOptions> {
     return {
       levels: [1, 2, 3, 4],
-      collapsed: undefined,
     };
   }
 
@@ -197,6 +209,29 @@ export default class Heading extends Node {
       ...options,
       Backspace: backspaceToParagraph(type),
       Enter: splitHeading(type),
+      // Cmd+Left in Firefox lands the DOM caret inside the heading-actions
+      // widget (contentEditable=false, ignoreSelection: true), so Prosemirror
+      // does not update its model. Subsequent commands like Enter then operate
+      // on the stale position. Move the model selection explicitly to keep it
+      // in sync with the visual caret.
+      "Mod-ArrowLeft": ((state, dispatch) => {
+        const { $from, empty } = state.selection;
+        if (!empty || $from.parent.type !== type) {
+          return false;
+        }
+        const start = $from.start();
+        if ($from.pos === start) {
+          return false;
+        }
+        if (dispatch) {
+          dispatch(
+            state.tr
+              .setSelection(TextSelection.create(state.doc, start))
+              .scrollIntoView()
+          );
+        }
+        return true;
+      }) as Command,
     };
   }
 

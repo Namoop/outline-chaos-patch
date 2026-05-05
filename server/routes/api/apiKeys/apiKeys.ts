@@ -1,7 +1,8 @@
 import Router from "koa-router";
 import { Op, Sequelize, type WhereOptions } from "sequelize";
-import { UserRole } from "@shared/types";
+import { Scope, UserRole } from "@shared/types";
 import auth from "@server/middlewares/authentication";
+import { rateLimiter } from "@server/middlewares/rateLimiter";
 import { transaction } from "@server/middlewares/transaction";
 import validate from "@server/middlewares/validate";
 import { ApiKey, User } from "@server/models";
@@ -9,13 +10,17 @@ import { authorize, cannot } from "@server/policies";
 import { presentApiKey } from "@server/presenters";
 import type { APIContext } from "@server/types";
 import { AuthenticationType } from "@server/types";
+import { RateLimiterStrategy } from "@server/utils/RateLimiter";
 import pagination from "../middlewares/pagination";
 import * as T from "./schema";
 
 const router = new Router();
 
+const globalScopes = new Set<string>(Object.values(Scope));
+
 router.post(
   "apiKeys.create",
+  rateLimiter(RateLimiterStrategy.TwentyFivePerMinute),
   auth({
     role: UserRole.Member,
     type: AuthenticationType.APP,
@@ -33,7 +38,7 @@ router.post(
       userId: user.id,
       expiresAt,
       scope: scope?.map((s) =>
-        s.startsWith("/api/") || s.includes(":")
+        s.startsWith("/api/") || s.includes(":") || globalScopes.has(s)
           ? s
           : `/api/${s.replace(/^\//, "")}`
       ),
