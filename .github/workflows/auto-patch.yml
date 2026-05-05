@@ -1,0 +1,77 @@
+name: Auto-Patch Chaos Outline
+
+on:
+  schedule:
+    # Run every Monday at 09:17 UTC to check for upstream updates.
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-patch-main
+  cancel-in-progress: false
+
+jobs:
+  propose-upstream-sync:
+    name: Propose upstream sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/outline/outline.git
+          git fetch upstream main
+
+      - name: Check for upstream updates
+        id: upstream
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+            echo "main already contains upstream/main"
+          else
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream into sync branch
+        if: steps.upstream.outputs.has_updates == 'true'
+        run: |
+          git checkout -B sync/upstream-main
+          git merge --no-edit upstream/main
+
+      - name: Push sync branch
+        if: steps.upstream.outputs.has_updates == 'true'
+        run: |
+          git push --force-with-lease origin sync/upstream-main
+
+      - name: Open or update pull request
+        if: steps.upstream.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr_number="$(gh pr list --head sync/upstream-main --base main --state open --json number --jq '.[0].number')"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
+              --title "Sync upstream Outline main" \
+              --body "Automated attempt to merge outline/outline main into this CHAOS patch fork."
+          else
+            gh pr create \
+              --base main \
+              --head sync/upstream-main \
+              --title "Sync upstream Outline main" \
+              --body "Automated attempt to merge outline/outline main into this CHAOS patch fork."
+          fi
